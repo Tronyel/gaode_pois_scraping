@@ -1,5 +1,5 @@
 # gaode_pois_scraping
-Scraping AMap(GaoDe) POIs through the rest api base on Python
+Scraping AMap(GaoDe) POIs which through the rest api based on Python
 # python3 爬虫高德POI数据到Postgis中
 ## 基本说明
 本代码是基于python3来实现的，利用高德的poi搜索接口进行爬虫。</br>

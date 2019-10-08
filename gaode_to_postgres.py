@@ -21,6 +21,8 @@ logger = mylogger.LogObject()
 
 def get_data(page_index, url_amap):
     global total_record
+    global amap_key_index
+    global page_size
     time.sleep(1)  # 休眠1秒
     logger.info('---  GET POI START, CURRENT PAGE IS '+str(page_index)+' ---')
     url = url_amap.replace('page_index', str(page_index))
@@ -33,7 +35,7 @@ def get_data(page_index, url_amap):
     except Exception as e:
         logger.error('--- Request was refuesed ! wait 2 minutes... ...')
         time.sleep(120)
-        get_data(page_index, url_amap)  # 重新执行方法
+        getPOIdata(page_size, url_amap)  # 重新执行方法
         return
 
     poi_json = response.json()
@@ -41,16 +43,28 @@ def get_data(page_index, url_amap):
     # 判断key是否可用，如果不可用，则重新获取key
     amap_info = poi_json.get('info')  # 返回的信息
     if (amap_info == 'DAILY_QUERY_OVER_LIMIT' or amap_info == 'INVALID_USER_KEY'):
-        old_key = amap_keys[amap_key_index]['key']
+
+        # 这个地方有点问题，每次遍历不同的城市的时候，key会从0开始
+        if(url.find(amap_keys[0]['key']) > 0 and amap_key_index > 1):
+            old_key = amap_keys[0]['key']
+            amap_key_index -= 1
+        else:
+            old_key = amap_keys[amap_key_index]['key']
+
         amap_key_index += 1
+
         if amap_key_index > 9:
             logger.info(
                 '--- No key available , we will retry after 3 hours... ...')
             amap_key_index = 0
             time.sleep(10800)  # 睡眠3个小时
+
         curr_key = amap_keys[amap_key_index]['key']
-        url = url_amap.replace(old_key, curr_key)
-        get_data(page_index, url)
+        logger.info('--- Old Key : '+old_key+' ; Current Key : '+curr_key +
+                    '; Current Key Index : '+str(amap_key_index))
+        curr_url = url_amap.replace(old_key, curr_key)
+        logger.info('--- The Curent Url is : ' + curr_url + ' ---')
+        getPOIdata(page_size, curr_url)  # 重新获取数据
         return
 
     if total_record == 0:
@@ -95,6 +109,8 @@ def get_data(page_index, url_amap):
 def getPOIdata(page_size, url_amap):
     global total_record
 
+    logger.critical('--- THE CURRENT URL IS : ' + url_amap + ' ---')
+
     try:
         json_data = get_data(1, url_amap)
         if (total_record / page_size) != 0:
@@ -102,18 +118,21 @@ def getPOIdata(page_size, url_amap):
         else:
             page_number = int(total_record / page_size) + 1
 
+        logger.critical('--- CURRENT PAGE NUMBER IS : ' +
+                        str(page_number)+' ---')
+
         for each_page in range(2, page_number):
             get_data(each_page, url_amap)
     except Exception as e:
-        time.sleep(60)
         logger.error('--- GET POI DATA FUNCTION ERROR , DETAIL AS BELOW: ---')
         logger.error(str(e))
-        getPOIdata(page_size,url_amap)
+        time.sleep(60)
+        getPOIdata(page_size, url_amap)
 
 
 def pg_connector():
     connector = psycopg2.connect(database="postgres", user="postgres",
-                                 password="postgres", host="HOTS-IP", port="5432")
+                                 password="postgres", host="xxx.xxx.xxx.xxx", port="5432")
 
     return connector
 
@@ -122,6 +141,8 @@ if __name__ == '__main__':
     global connector  # pg连接
     global amap_keys  # 高德地图的keys
     global amap_key_index  # 当前key的下标，默认为0，是第一个key
+    global page_size
+    global current_amp_key  # 当前的key
     amap_key_index = 0
 
     connector = pg_connector()
@@ -142,7 +163,7 @@ if __name__ == '__main__':
 
     for y in range(0, len(city)):
         for j in range(len(poiCodeJson)):
-            url_amap = 'http://restapi.amap.com/v3/place/text?key='+amap_keys[0]['key']+'&types='+poiCodeJson[j]['type'] + \
+            url_amap = 'http://restapi.amap.com/v3/place/text?key='+amap_keys[amap_key_index]['key']+'&types='+poiCodeJson[j]['type'] + \
                 '&city=' + \
                 city[y] + '&citylimit=true&children=1&offset=25&page=page_index&extensions=all'
             logger.info('--- CURRENT URL ---')
